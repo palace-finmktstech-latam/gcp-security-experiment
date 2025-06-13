@@ -3,13 +3,13 @@ import firebase_admin
 from firebase_admin import credentials, auth
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-from google.cloud import aiplatform, storage
+from google.cloud import aiplatform, storage, dlp_v2 as dlp
 import vertexai
 from vertexai.preview.generative_models import GenerativeModel, Part
 import pypdf
 from functools import wraps
 import google.auth
-from google.auth import impersonated_credentials # <--- NEW IMPORT for Claude's suggestion
+from google.auth import impersonated_credentials
 
 # --- Firebase Admin SDK Initialization ---
 try:
@@ -25,8 +25,8 @@ CORS(app)
 # --- Cloud Run Environment Configuration ---
 GCP_PROJECT_ID = os.environ.get("GCP_PROJECT_ID")
 GCP_PROJECT_REGION = os.environ.get("GCP_PROJECT_REGION")
-PDF_BUCKET_NAME = "pdf-summarizer-pdfs-gcp-security-experiment" # REPLACE if you used a different bucket name!
-PDF_BUCKET_LOCATION = "southamerica-west1" # This must match your bucket's location!
+PDF_BUCKET_NAME = "pdf-summarizer-pdfs-gcp-security-experiment" 
+PDF_BUCKET_LOCATION = "southamerica-west1" 
 
 # --- Vertex AI Initialization ---
 try:
@@ -43,25 +43,26 @@ except Exception as e:
 model = GenerativeModel("gemini-2.0-flash-001")
 
 # --- Initialize Google Cloud Storage client with impersonated credentials for signing ---
-# This is Claude's suggested approach to get credentials capable of signing V4 signed URLs.
 try:
-    # Get default credentials (your Cloud Run service account)
     source_credentials, project_id = google.auth.default()
-
-    # Create impersonated credentials for signing
-    # The target_principal is your service account's email
     target_credentials = impersonated_credentials.Credentials(
         source_credentials=source_credentials,
-        target_principal="pdf-summarizer-sa@gcp-security-experiment.iam.gserviceaccount.com", # <--- YOUR SERVICE ACCOUNT EMAIL!
-        target_scopes=['https://www.googleapis.com/auth/cloud-platform'] # Broad scope for GCS access
+        target_principal="pdf-summarizer-sa@gcp-security-experiment.iam.gserviceaccount.com",
+        target_scopes=['https://www.googleapis.com/auth/cloud-platform']
     )
-    
     storage_client = storage.Client(credentials=target_credentials, project=project_id)
     print("Google Cloud Storage client initialized with impersonated credentials for signing.")
 except Exception as e:
     print(f"Error initializing Google Cloud Storage client for signing: {e}")
     print("Please ensure the service account has roles/iam.serviceAccountTokenCreator (on itself!) and appropriate storage roles.")
     exit(1)
+
+# --- Initialize Google Cloud DLP client ---
+dlp_client = dlp.DlpServiceClient()
+# IMPORTANT: Adjust DLP processing location if you changed it in the last step
+#dlp_parent = f"projects/{GCP_PROJECT_ID}/locations/us-central1"
+dlp_parent = f"projects/{GCP_PROJECT_ID}/locations/southamerica-west1"
+print(f"Google Cloud DLP client initialized for parent: {dlp_parent}")
 
 # --- Authentication Decorator (The "Bouncer") ---
 def verify_firebase_token(f):
@@ -130,7 +131,7 @@ def get_signed_url():
         print(f"Error generating signed URL: {e}")
         return jsonify({"error": f"Failed to generate signed URL: {str(e)}"}), 500
 
-# --- MODIFIED: Summarize PDF API Endpoint (reads from GCS) ---
+# --- MODIFIED: Summarize PDF API Endpoint (reads from GCS and uses DLP) ---
 @app.route('/summarize-pdf', methods=['POST', 'OPTIONS'])
 @verify_firebase_token
 def summarize_pdf():
@@ -161,9 +162,60 @@ def summarize_pdf():
         if not pdf_text.strip():
             return jsonify({"error": "Could not extract text from PDF or PDF is empty."}), 400
 
-        prompt = f"Summarize this document in 200 words:\n\n{pdf_text}"
+        # --- DLP Integration ---
+        dlp_item = {"value": pdf_text}
+        
+        # Define info types for both INSPECTION and DE-IDENTIFICATION
+        all_relevant_info_types = [
+            {"name": "EMAIL_ADDRESS"},
+            {"name": "PHONE_NUMBER"},
+            {"name": "CREDIT_CARD_NUMBER"},
+            {"name": "PERSON_NAME"},
+            {"name": "DATE_OF_BIRTH"},
+            {"name": "LOCATION"},
+            # {"name": "SSN"}, # Removed due to regional availability
+            {"name": "IBAN_CODE"},
+            {"name": "SWIFT_CODE"},
+            {"name": "CHILE_CDI_NUMBER"},
+            # {"name": "ACCOUNT_NUMBER"}, # Removed due to regional availability
+        ]
+        
+        # New: Define the InspectConfig. This tells DLP what to look for.
+        inspect_config = {
+            "info_types": all_relevant_info_types,
+            "include_quote": True,
+        }
 
-        print("Sending text to Gemini...")
+        # Redaction configuration: replace with info type name (e.g., [PHONE_NUMBER])
+        redact_config = {
+            "info_type_transformations": {
+                "transformations": [
+                    {
+                        "info_types": all_relevant_info_types,
+                        "primitive_transformation": {"replace_with_info_type_config": {}}
+                    }
+                ]
+            }
+        }
+        
+        # Build the de-identification request
+        dlp_request = {
+            "parent": dlp_parent,
+            "item": dlp_item,
+            "deidentify_config": redact_config,
+            "inspect_config": inspect_config,
+        }
+        
+        print("Sending text to DLP for de-identification...")
+        dlp_response = dlp_client.deidentify_content(request=dlp_request)
+        deidentified_text = dlp_response.item.value
+        print("Received de-identified text from DLP.")
+        # --- End DLP Integration ---
+
+        # Prepare the prompt for Gemini with de-identified text
+        prompt = f"Summarize this document in 200 words:\n\n{deidentified_text}"
+
+        print("Sending de-identified text to Gemini...")
         response = model.generate_content(
             prompt,
             generation_config={"max_output_tokens": 200, "temperature": 0.2}
@@ -172,10 +224,15 @@ def summarize_pdf():
         summary = response.text
         print("Received summary from Gemini.")
         
-        return jsonify({"summary": summary})
+        # MODIFIED: Return original_text and deidentified_text too
+        return jsonify({
+            "summary": summary,
+            "original_text": pdf_text,
+            "deidentified_text": deidentified_text
+        })
 
     except Exception as e:
-        print(f"An error occurred during summarization (GCS read): {e}")
+        print(f"An error occurred during summarization (GCS read or DLP): {e}")
         return jsonify({"error": f"An error occurred during processing: {str(e)}"}), 500
 
 @app.route('/', methods=['GET'])

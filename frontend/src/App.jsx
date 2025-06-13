@@ -1,4 +1,3 @@
-// frontend/src/App.jsx
 import React, { useState, useEffect } from 'react';
 import './App.css';
 import { auth } from './firebaseConfig';
@@ -24,8 +23,13 @@ function App() {
 
   // --- New state for Cloud Storage object name ---
   const [cloudStorageObjectName, setCloudStorageObjectName] = useState('');
+  // --- New states for DLP demonstration ---
+  const [originalText, setOriginalText] = useState('');
+  const [deidentifiedText, setDeidentifiedText] = useState('');
 
-  const CLOUD_RUN_URL = 'https://pdf-summarizer-backend-459042076639.us-central1.run.app'; // e.g., 'https://pdf-summarizer-backend-xxxxxx-uc.a.run.app'
+
+  // IMPORTANT: Replace with the actual URL of your deployed Cloud Run service
+  const CLOUD_RUN_URL = 'https://pdf-summarizer-backend-459042076639.us-central1.run.app';
 
   // --- Authentication State Listener ---
   useEffect(() => {
@@ -65,7 +69,9 @@ function App() {
       await signOut(auth);
       setSummary('');
       setSelectedFile(null);
-      setCloudStorageObjectName(''); // Clear object name on logout
+      setCloudStorageObjectName('');
+      setOriginalText(''); // Clear DLP demo
+      setDeidentifiedText(''); // Clear DLP demo
     } catch (err) {
       setAuthError(err.message);
       console.error("Sign out error:", err);
@@ -77,7 +83,9 @@ function App() {
     setSelectedFile(event.target.files[0]);
     setSummary('');
     setError('');
-    setCloudStorageObjectName(''); // Clear object name if file changes
+    setCloudStorageObjectName('');
+    setOriginalText(''); // Clear DLP demo
+    setDeidentifiedText(''); // Clear DLP demo
   };
 
   const handleSubmit = async (event) => {
@@ -94,7 +102,9 @@ function App() {
     setLoading(true);
     setError('');
     setSummary('');
-    setCloudStorageObjectName(''); // Reset for new submission
+    setCloudStorageObjectName('');
+    setOriginalText('');
+    setDeidentifiedText('');
 
     try {
       const idToken = await user.getIdToken();
@@ -119,7 +129,7 @@ function App() {
       }
       const { signedUrl, objectName } = await signedUrlResponse.json();
       console.log('Received signed URL and object name:', objectName);
-      setCloudStorageObjectName(objectName); // Store object name for potential debugging or future use
+      setCloudStorageObjectName(objectName);
 
       // --- STEP 2: Directly Upload PDF to Google Cloud Storage using Signed URL ---
       console.log('Uploading PDF directly to Cloud Storage...');
@@ -127,9 +137,8 @@ function App() {
         method: 'PUT',
         headers: {
           'Content-Type': selectedFile.type,
-          // No Authorization header here, as the URL itself is pre-authenticated
         },
-        body: selectedFile, // Send the raw file data
+        body: selectedFile,
       });
 
       if (!uploadResponse.ok) {
@@ -143,9 +152,9 @@ function App() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${idToken}` // Still need token for this call
+          'Authorization': `Bearer ${idToken}`
         },
-        body: JSON.stringify({ objectName: objectName }) // Send objectName, not file
+        body: JSON.stringify({ objectName: objectName })
       });
 
       if (!summarizeResponse.ok) {
@@ -155,7 +164,9 @@ function App() {
 
       const data = await summarizeResponse.json();
       setSummary(data.summary);
-      console.log('Summary received from backend.');
+      setOriginalText(data.original_text); // Set original text from backend
+      setDeidentifiedText(data.deidentified_text); // Set de-identified text from backend
+      console.log('Summary and DLP data received from backend.');
 
     } catch (err) {
       console.error('Full process error:', err);
@@ -223,10 +234,27 @@ function App() {
           {cloudStorageObjectName && !loading && (
             <p>Uploaded as: {cloudStorageObjectName}</p>
           )}
+          
+          {/* NEW: Display original and de-identified text for DLP demo */}
+          {(originalText || deidentifiedText) && (
+            <div className="dlp-demo-output">
+              <h2>DLP Demonstration:</h2>
+              <div style={{display: 'flex', gap: '20px', textAlign: 'left'}}>
+                <div style={{flex: 1, border: '1px solid #ddd', padding: '10px', borderRadius: '5px'}}>
+                  <h3>Original Text Sent to DLP:</h3>
+                  <p style={{whiteSpace: 'pre-wrap', maxHeight: '300px', overflowY: 'auto', fontSize: '0.8em'}}>{originalText}</p>
+                </div>
+                <div style={{flex: 1, border: '1px solid #ddd', padding: '10px', borderRadius: '5px'}}>
+                  <h3>De-identified Text Sent to LLM:</h3>
+                  <p style={{whiteSpace: 'pre-wrap', maxHeight: '300px', overflowY: 'auto', fontSize: '0.8em'}}>{deidentifiedText}</p>
+                </div>
+              </div>
+            </div>
+          )}
 
           {summary && (
             <div className="summary-output">
-              <h2>Summary:</h2>
+              <h2>Summary (from De-identified Text):</h2>
               <p>{summary}</p>
             </div>
           )}

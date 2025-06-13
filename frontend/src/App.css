@@ -1,9 +1,12 @@
 /* frontend/src/App.css */
+
+/* General App container improvements */
 #root {
-  max-width: 1280px;
+  max-width: 1400px; /* Increase max-width to give more space */
   margin: 0 auto;
   padding: 2rem;
   text-align: center;
+  box-sizing: border-box; /* Ensure padding doesn't increase total width */
 }
 
 .App {
@@ -11,19 +14,133 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 20px;
-}
-
-.auth-container, .app-content {
-  border: 1px solid #ccc;
+  gap: 30px; /* Increase overall spacing */
   padding: 20px;
-  border-radius: 8px;
-  background-color: #f9f9f9;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-  width: 100%;
-  max-width: 400px;
 }
 
+/* Auth and App Content Containers */
+.auth-container, .app-content {
+  border: 1px solid #e0e0e0;
+  padding: 30px; /* Add more internal padding */
+  border-radius: 10px;
+  background-color: #ffffff;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.08); /* More subtle shadow */
+  width: 100%;
+  max-width: 800px; /* Give app content more width */
+  box-sizing: border-box;
+}
+
+/* User Info Section */
+.user-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-bottom: 20px;
+  margin-bottom: 20px;
+  border-bottom: 1px solid #eee;
+}
+
+.user-info p {
+  margin: 0;
+  font-size: 1.1em;
+  font-weight: bold;
+  color: #333;
+}
+
+/* Form Styles */
+form {
+  display: flex;
+  flex-direction: column;
+  gap: 15px; /* Spacing between form elements */
+  width: 100%;
+}
+
+form input[type="file"] {
+  padding: 10px;
+  border: 1px solid #ddd;
+  border-radius: 5px;
+  background-color: #f5f5f5;
+  cursor: pointer;
+}
+
+form button {
+  padding: 12px 20px;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 1.1em;
+  font-weight: bold;
+}
+
+/* DLP Demo Output Section */
+.dlp-demo-output {
+  margin-top: 30px; /* Spacing from form */
+  border-top: 1px solid #eee;
+  padding-top: 30px;
+  width: 100%;
+}
+
+.dlp-demo-output h2 {
+  font-size: 1.5em;
+  margin-bottom: 20px;
+  color: #0056b3;
+}
+
+.dlp-text-containers {
+  display: flex;
+  flex-wrap: wrap; /* Allow wrapping on smaller screens */
+  gap: 20px; /* Space between the two text boxes */
+  justify-content: center; /* Center if less than two items per row */
+}
+
+.dlp-text-container {
+  flex: 1; /* Allow containers to grow and shrink */
+  min-width: 300px; /* Minimum width before wrapping */
+  max-width: 48%; /* Max width to ensure two columns */
+  border: 1px solid #a0c0e0; /* Blueish border */
+  padding: 15px;
+  border-radius: 8px;
+  background-color: #eaf5ff; /* Light blue background */
+  box-shadow: inset 0 1px 3px rgba(0,0,0,0.1);
+  overflow: hidden; /* Hide scrollbars if content is small */
+  display: flex;
+  flex-direction: column;
+}
+
+.dlp-text-container h3 {
+  font-size: 1em;
+  margin-top: 0;
+  margin-bottom: 10px;
+  color: #003366;
+  border-bottom: 1px solid #c0d9ed;
+  padding-bottom: 8px;
+}
+
+.dlp-text-container p {
+  white-space: pre-wrap;
+  max-height: 400px; /* Limit height and make scrollable */
+  overflow-y: auto;
+  font-size: 0.9em;
+  color: #333;
+  line-height: 1.4;
+  margin: 0;
+}
+
+/* Summary Output */
+.summary-output {
+  margin-top: 30px;
+  border-top: 1px solid #eee;
+  padding-top: 30px;
+  width: 100%;
+}
+
+.summary-output h2 {
+  font-size: 1.5em;
+  margin-bottom: 20px;
+  color: #28a745;
+}
+
+/* Basic auth form styles (if not already present or needs override) */
 .auth-container input {
   display: block;
   width: calc(100% - 20px);
@@ -46,63 +163,9 @@
 .auth-buttons button:hover {
   background-color: #0056b3;
 }
-
-.auth-buttons button[type="button"] { /* For Sign Up button */
+.auth-buttons button[type="button"] {
   background-color: #6c757d;
 }
 .auth-buttons button[type="button"]:hover {
   background-color: #5a6268;
-}
-
-.user-info {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  width: 100%;
-  margin-bottom: 20px;
-}
-
-.user-info button {
-  padding: 8px 12px;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-  background-color: #dc3545;
-  color: white;
-}
-
-.user-info button:hover {
-  background-color: #c82333;
-}
-
-form {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  width: 100%;
-}
-
-form button {
-  padding: 10px 15px;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-  background-color: #28a745;
-  color: white;
-}
-
-form button:disabled {
-  background-color: #cccccc;
-  cursor: not-allowed;
-}
-
-form button:hover:not(:disabled) {
-  background-color: #218838;
-}
-
-.summary-output {
-  margin-top: 20px;
-  text-align: left;
-  border-top: 1px solid #eee;
-  padding-top: 20px;
 }

@@ -1,3 +1,12 @@
+# Core Flask and general utilities (kept pins)
+Flask==3.1.1
+flask-cors==6.0.0
+gunicorn==22.0.0
+pypdf==5.6.0
+firebase-admin==6.4.0 # Kept specific as it's an external library
+requests==2.32.3 # Kept specific as it's an external library
+
+# Other general Python libraries (kept pins for consistency if they're not causing conflicts)
 annotated-types==0.7.0
 anyio==4.9.0
 blinker==1.9.0
@@ -7,25 +16,6 @@ charset-normalizer==3.4.2
 click==8.2.1
 colorama==0.4.6
 docstring_parser==0.16
-firebase-admin==6.4.0
-Flask==3.1.1
-flask-cors==6.0.0
-google-api-core==2.25.0
-google-auth==2.40.2
-google-auth-oauthlib==1.2.0
-google-cloud-aiplatform==1.95.1
-google-cloud-bigquery==3.34.0
-google-cloud-core==2.4.3
-google-cloud-resource-manager==1.14.2
-google-cloud-storage==2.19.0
-google-crc32c==1.7.1
-google-genai==1.18.0
-google-resumable-media==2.7.2
-googleapis-common-protos==1.70.0
-grpc-google-iam-v1==0.14.2
-grpcio==1.72.1
-grpcio-status==1.72.1
-gunicorn==22.0.0
 h11==0.16.0
 httpcore==1.0.9
 httpx==0.28.1
@@ -35,15 +25,11 @@ Jinja2==3.1.6
 MarkupSafe==3.0.2
 numpy==2.2.6
 packaging==25.0
-proto-plus==1.26.1
-protobuf==6.31.1
 pyasn1==0.6.1
 pyasn1_modules==0.4.2
 pydantic==2.11.5
 pydantic_core==2.33.2
-pypdf==5.6.0
 python-dateutil==2.9.0.post0
-requests==2.32.3
 rsa==4.9.1
 shapely==2.1.1
 six==1.17.0
@@ -53,3 +39,25 @@ typing_extensions==4.14.0
 urllib3==2.4.0
 websockets==15.0.1
 Werkzeug==3.1.3
+
+
+# Google Cloud and related core libraries - REMOVED VERSION PINS
+# Let pip determine the compatible versions to resolve protobuf conflicts.
+google-api-core
+google-auth
+google-auth-oauthlib
+google-cloud-aiplatform
+google-cloud-bigquery
+google-cloud-core
+google-cloud-dlp
+google-cloud-resource-manager
+google-cloud-storage
+google-crc32c
+google-genai
+google-resumable-media
+googleapis-common-protos
+grpc-google-iam-v1
+grpcio
+grpcio-status
+proto-plus
+protobuf
