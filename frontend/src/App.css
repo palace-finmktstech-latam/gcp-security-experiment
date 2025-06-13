@@ -1,0 +1,108 @@
+/* frontend/src/App.css */
+#root {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 2rem;
+  text-align: center;
+}
+
+.App {
+  font-family: sans-serif;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+}
+
+.auth-container, .app-content {
+  border: 1px solid #ccc;
+  padding: 20px;
+  border-radius: 8px;
+  background-color: #f9f9f9;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  width: 100%;
+  max-width: 400px;
+}
+
+.auth-container input {
+  display: block;
+  width: calc(100% - 20px);
+  padding: 10px;
+  margin-bottom: 10px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+}
+
+.auth-buttons button {
+  padding: 10px 15px;
+  margin: 5px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  background-color: #007bff;
+  color: white;
+}
+
+.auth-buttons button:hover {
+  background-color: #0056b3;
+}
+
+.auth-buttons button[type="button"] { /* For Sign Up button */
+  background-color: #6c757d;
+}
+.auth-buttons button[type="button"]:hover {
+  background-color: #5a6268;
+}
+
+.user-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  margin-bottom: 20px;
+}
+
+.user-info button {
+  padding: 8px 12px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  background-color: #dc3545;
+  color: white;
+}
+
+.user-info button:hover {
+  background-color: #c82333;
+}
+
+form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+}
+
+form button {
+  padding: 10px 15px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  background-color: #28a745;
+  color: white;
+}
+
+form button:disabled {
+  background-color: #cccccc;
+  cursor: not-allowed;
+}
+
+form button:hover:not(:disabled) {
+  background-color: #218838;
+}
+
+.summary-output {
+  margin-top: 20px;
+  text-align: left;
+  border-top: 1px solid #eee;
+  padding-top: 20px;
+}

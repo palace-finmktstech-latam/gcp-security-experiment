@@ -1,0 +1,55 @@
+# Python artifacts
+venv/
+__pycache__/
+*.pyc
+*.log
+.Python
+.venv/
+.pytest_cache/
+.mypy_cache/
+
+# Node.js artifacts
+node_modules/
+dist/
+build/
+.parcel-cache/
+.next/
+.cache/
+
+# Firebase
+.firebase/
+firebase-debug.log
+firebase-*.log
+.firebaserc
+firebase.json  # IMPORTANT: Only if you want to regenerate it every time. If you want to keep it, comment this out.
+               # For this project, you've done `firebase init`, so it's probably useful to keep it.
+
+# Docker
+*.dockerignore # The ignore file itself is usually kept
+*.dockerfile # Dockerfiles are kept
+!.dockerignore # allow .dockerignore to be tracked
+!.gitkeep # allow empty directories
+
+# Environment variables
+.env
+.env.local
+.flaskenv
+
+# Local credentials / sensitive files (IMPORTANT: These should NEVER be committed)
+*.pem
+*.json # Be careful with this! If you have any JSON config files that are NOT secrets
+       # (like package.json, tsconfig.json), you'll need to explicitly `git add -f` them
+       # or whitelist them. For IAM policies or service account keys, this is essential.
+project-iam-policy.yaml # Explicitly ignore this as it's policy that might be sensitive
+cors-policy.json # Can be regenerated, good to ignore
+
+# IDE and OS specific files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.nyc_output
+coverage/

@@ -1,0 +1,46 @@
+bindings:
+- members:
+  - serviceAccount:pdf-summarizer-sa@gcp-security-experiment.iam.gserviceaccount.com
+  role: roles/aiplatform.user
+- members:
+  - serviceAccount:pdf-summarizer-sa@gcp-security-experiment.iam.gserviceaccount.com
+  role: roles/artifactregistry.reader
+- members:
+  - serviceAccount:service-459042076639@gcp-sa-artifactregistry.iam.gserviceaccount.com
+  role: roles/artifactregistry.serviceAgent
+- members:
+  - serviceAccount:service-459042076639@containerregistry.iam.gserviceaccount.com
+  role: roles/containerregistry.ServiceAgent
+- members:
+  - serviceAccount:459042076639-compute@developer.gserviceaccount.com
+  role: roles/editor
+- members:
+  - serviceAccount:service-459042076639@gcp-sa-firebase.iam.gserviceaccount.com
+  role: roles/firebase.managementServiceAgent
+- members:
+  - serviceAccount:firebase-adminsdk-fbsvc@gcp-security-experiment.iam.gserviceaccount.com
+  role: roles/firebase.sdkAdminServiceAgent
+- members:
+  - serviceAccount:pdf-summarizer-sa@gcp-security-experiment.iam.gserviceaccount.com
+  role: roles/firebase.viewer
+- members:
+  - serviceAccount:firebase-adminsdk-fbsvc@gcp-security-experiment.iam.gserviceaccount.com
+  role: roles/firebaseauth.admin
+- members:
+  - serviceAccount:firebase-adminsdk-fbsvc@gcp-security-experiment.iam.gserviceaccount.com
+  - serviceAccount:pdf-summarizer-sa@gcp-security-experiment.iam.gserviceaccount.com
+  role: roles/iam.serviceAccountTokenCreator
+- members:
+  - user:ben.clark@palace.cl
+  role: roles/owner
+- members:
+  - serviceAccount:service-459042076639@gcp-sa-pubsub.iam.gserviceaccount.com
+  role: roles/pubsub.serviceAgent
+- members:
+  - user:ben.clark@palace.cl
+  role: roles/run.admin
+- members:
+  - serviceAccount:service-459042076639@serverless-robot-prod.iam.gserviceaccount.com
+  role: roles/run.serviceAgent
+etag: BwY2xfZnGdI=
+version: 1
