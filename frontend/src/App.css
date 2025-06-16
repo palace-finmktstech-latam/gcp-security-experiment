@@ -87,22 +87,20 @@ form button {
 }
 
 .dlp-text-containers {
-  display: flex;
-  flex-wrap: wrap; /* Allow wrapping on smaller screens */
-  gap: 20px; /* Space between the two text boxes */
-  justify-content: center; /* Center if less than two items per row */
+  display: grid; /* Use grid for more flexible column control */
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); /* 4 columns for large screens, wraps on smaller */
+  gap: 20px;
+  justify-content: center;
 }
 
 .dlp-text-container {
-  flex: 1; /* Allow containers to grow and shrink */
-  min-width: 300px; /* Minimum width before wrapping */
-  max-width: 48%; /* Max width to ensure two columns */
-  border: 1px solid #a0c0e0; /* Blueish border */
+  /* No need for flex:1 and max-width: 48% with grid */
+  border: 1px solid #a0c0e0;
   padding: 15px;
   border-radius: 8px;
-  background-color: #eaf5ff; /* Light blue background */
+  background-color: #eaf5ff;
   box-shadow: inset 0 1px 3px rgba(0,0,0,0.1);
-  overflow: hidden; /* Hide scrollbars if content is small */
+  overflow: hidden;
   display: flex;
   flex-direction: column;
 }

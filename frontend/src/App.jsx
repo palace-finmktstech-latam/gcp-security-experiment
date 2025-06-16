@@ -23,9 +23,12 @@ function App() {
 
   // --- New state for Cloud Storage object name ---
   const [cloudStorageObjectName, setCloudStorageObjectName] = useState('');
-  // --- New states for DLP demonstration ---
+  // --- States for DLP/Pseudonymization demonstration ---
   const [originalText, setOriginalText] = useState('');
-  const [deidentifiedText, setDeidentifiedText] = useState('');
+  const [pseudonymizedText, setPseudonymizedText] = useState(''); // This is the text sent to DLP
+  const [deidentifiedText, setDeidentifiedText] = useState(''); // This is the text sent to LLM
+  const [llmOutputPseudonymized, setLlmOutputPseudonymized] = useState(''); // New state for raw LLM output
+  const [finalSummary, setFinalSummary] = useState(''); // This will hold summary with real names
 
 
   // IMPORTANT: Replace with the actual URL of your deployed Cloud Run service
@@ -70,8 +73,11 @@ function App() {
       setSummary('');
       setSelectedFile(null);
       setCloudStorageObjectName('');
-      setOriginalText(''); // Clear DLP demo
-      setDeidentifiedText(''); // Clear DLP demo
+      setOriginalText('');
+      setPseudonymizedText('');
+      setDeidentifiedText('');
+      setLlmOutputPseudonymized(''); // Clear new state
+      setFinalSummary('');
     } catch (err) {
       setAuthError(err.message);
       console.error("Sign out error:", err);
@@ -84,8 +90,11 @@ function App() {
     setSummary('');
     setError('');
     setCloudStorageObjectName('');
-    setOriginalText(''); // Clear DLP demo
-    setDeidentifiedText(''); // Clear DLP demo
+    setOriginalText('');
+    setPseudonymizedText('');
+    setDeidentifiedText('');
+    setLlmOutputPseudonymized(''); // Clear new state
+    setFinalSummary('');
   };
 
   const handleSubmit = async (event) => {
@@ -104,7 +113,10 @@ function App() {
     setSummary('');
     setCloudStorageObjectName('');
     setOriginalText('');
+    setPseudonymizedText('');
     setDeidentifiedText('');
+    setLlmOutputPseudonymized('');
+    setFinalSummary('');
 
     try {
       const idToken = await user.getIdToken();
@@ -163,10 +175,13 @@ function App() {
       }
 
       const data = await summarizeResponse.json();
-      setSummary(data.summary);
-      setOriginalText(data.original_text); // Set original text from backend
-      setDeidentifiedText(data.deidentified_text); // Set de-identified text from backend
-      console.log('Summary and DLP data received from backend.');
+      setSummary(data.summary); // Final summary with real names
+      setOriginalText(data.original_text);
+      setPseudonymizedText(data.pseudonymized_text); // Text sent to DLP (with pseudonyms)
+      setDeidentifiedText(data.deidentified_text); // Text sent to LLM (after DLP)
+      setLlmOutputPseudonymized(data.llm_output_pseudonymized); // Raw LLM output (with pseudonyms)
+      setFinalSummary(data.summary); // This will hold the re-identified summary
+      console.log('Summary and DLP/Pseudonymization data received from backend.');
 
     } catch (err) {
       console.error('Full process error:', err);
@@ -235,27 +250,28 @@ function App() {
             <p>Uploaded as: {cloudStorageObjectName}</p>
           )}
           
-          {/* NEW: Display original and de-identified text for DLP demo */}
-          {(originalText || deidentifiedText) && (
+          {/* NEW: Display original, pseudonymized, de-identified, and final summary */}
+          {(originalText || pseudonymizedText || deidentifiedText || llmOutputPseudonymized || finalSummary) && (
             <div className="dlp-demo-output">
-              <h2>DLP Demonstration:</h2>
-              <div style={{display: 'flex', gap: '20px', textAlign: 'left'}}>
-                <div style={{flex: 1, border: '1px solid #ddd', padding: '10px', borderRadius: '5px'}}>
-                  <h3>Original Text Sent to DLP:</h3>
-                  <p style={{whiteSpace: 'pre-wrap', maxHeight: '300px', overflowY: 'auto', fontSize: '0.8em'}}>{originalText}</p>
+              <h2>Data Transformation Pipeline:</h2>
+              <div className="dlp-text-containers" style={{gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))'}}>
+                <div className="dlp-text-container">
+                  <h3>Original Text (from PDF):</h3>
+                  <p>{originalText}</p>
                 </div>
-                <div style={{flex: 1, border: '1px solid #ddd', padding: '10px', borderRadius: '5px'}}>
-                  <h3>De-identified Text Sent to LLM:</h3>
-                  <p style={{whiteSpace: 'pre-wrap', maxHeight: '300px', overflowY: 'auto', fontSize: '0.8em'}}>{deidentifiedText}</p>
+                <div className="dlp-text-container">
+                  <h3>Pseudonymized/De-identified Text (Sent to LLM):</h3>
+                  <p>{pseudonymizedText}</p>
+                </div>
+                <div className="dlp-text-container">
+                  <h3>Raw LLM Output (Contains Pseudonyms):</h3>
+                  <p>{llmOutputPseudonymized}</p>
+                </div>
+                <div className="dlp-text-container">
+                  <h3>Final Summary (Re-identified):</h3>
+                  <p>{finalSummary}</p>
                 </div>
               </div>
-            </div>
-          )}
-
-          {summary && (
-            <div className="summary-output">
-              <h2>Summary (from De-identified Text):</h2>
-              <p>{summary}</p>
             </div>
           )}
         </div>

@@ -3,13 +3,16 @@ import firebase_admin
 from firebase_admin import credentials, auth
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-from google.cloud import aiplatform, storage, dlp_v2 as dlp
+from google.cloud import aiplatform, storage, dlp_v2, kms_v1
+from google.cloud.dlp_v2 import types as dlp_types
 import vertexai
 from vertexai.preview.generative_models import GenerativeModel, Part
 import pypdf
 from functools import wraps
 import google.auth
 from google.auth import impersonated_credentials
+
+dlp = dlp_v2 # <--- Keep this!
 
 # --- Firebase Admin SDK Initialization ---
 try:
@@ -59,10 +62,33 @@ except Exception as e:
 
 # --- Initialize Google Cloud DLP client ---
 dlp_client = dlp.DlpServiceClient()
-# IMPORTANT: Adjust DLP processing location if you changed it in the last step
-#dlp_parent = f"projects/{GCP_PROJECT_ID}/locations/us-central1"
-dlp_parent = f"projects/{GCP_PROJECT_ID}/locations/southamerica-west1"
-print(f"Google Cloud DLP client initialized for parent: {dlp_parent}")
+dlp_parent = f"projects/{GCP_PROJECT_ID}/locations/southamerica-west1" # DLP processing location
+# NEW: Define DLP KMS key for FPE
+DLP_KMS_KEY_NAME = f"projects/{GCP_PROJECT_ID}/locations/southamerica-west1/keyRings/dlp-crypto-keyring/cryptoKeys/dlp-fpe-key"
+print(f"Google Cloud DLP client initialized for parent: {dlp_parent}, using FPE key: {DLP_KMS_KEY_NAME}")
+
+# --- NEW: Initialize Google Cloud KMS client ---
+kms_client = kms_v1.KeyManagementServiceClient()
+print("Google Cloud KMS client initialized.")
+
+# --- Custom Counterparty Info Type Definition ---
+# This tells DLP how to identify your specific counterparty names.
+# This would ideally be managed as a stored DLP inspect template in production.
+CUSTOM_COUNTERPARTY_INFO_TYPE = [
+    {
+        "info_type": {"name": "CUSTOM_COUNTERPARTY_NAME"},
+        "dictionary": {  # CORRECTED: dictionary goes directly here, not in detection_rules
+            "word_list": {  # CORRECTED: word_list not wordList
+                "words": [
+                    "Goldman Sachs & Co. LLC",
+                    "Banco ABC S.A.", 
+                    "J.P. Morgan",
+                    "Citibank"
+                ]
+            }
+        }
+    }
+]
 
 # --- Authentication Decorator (The "Bouncer") ---
 def verify_firebase_token(f):
@@ -159,13 +185,28 @@ def summarize_pdf():
 
         pdf_file_stream.close()
 
+        pdf_text = pdf_text.replace('\n', ' ').replace('\r', '')
+
         if not pdf_text.strip():
             return jsonify({"error": "Could not extract text from PDF or PDF is empty."}), 400
 
-        # --- DLP Integration ---
+        # --- NEW: Envelope Encryption Step ---
+        # 1. Create a Data Encryption Key (DEK) for this specific operation.
+        #    This key will be wrapped by KMS and sent to DLP.
+        data_encryption_key = os.urandom(32)
+
+        # 2. Call KMS to encrypt (wrap) the DEK.
+        print(f"Wrapping DEK with KMS key: {DLP_KMS_KEY_NAME}")
+        wrap_response = kms_client.encrypt(
+            request={"name": DLP_KMS_KEY_NAME, "plaintext": data_encryption_key}
+        )
+        wrapped_key = wrap_response.ciphertext
+        print("DEK wrapped successfully.")
+        
+        # --- DLP Integration (Pseudonymization and Redaction) ---
         dlp_item = {"value": pdf_text}
         
-        # Define info types for both INSPECTION and DE-IDENTIFICATION
+        # Define info types for INSPECTION and DE-IDENTIFICATION
         all_relevant_info_types = [
             {"name": "EMAIL_ADDRESS"},
             {"name": "PHONE_NUMBER"},
@@ -173,25 +214,55 @@ def summarize_pdf():
             {"name": "PERSON_NAME"},
             {"name": "DATE_OF_BIRTH"},
             {"name": "LOCATION"},
-            # {"name": "SSN"}, # Removed due to regional availability
             {"name": "IBAN_CODE"},
             {"name": "SWIFT_CODE"},
-            {"name": "CHILE_CDI_NUMBER"},
-            # {"name": "ACCOUNT_NUMBER"}, # Removed due to regional availability
+            #{"name": "CUSTOM_COUNTERPARTY_NAME"}, 
         ]
         
-        # New: Define the InspectConfig. This tells DLP what to look for.
+        # 1. Inspect Config: What to look for
         inspect_config = {
             "info_types": all_relevant_info_types,
+            "custom_info_types": CUSTOM_COUNTERPARTY_INFO_TYPE,
             "include_quote": True,
         }
 
-        # Redaction configuration: replace with info type name (e.g., [PHONE_NUMBER])
-        redact_config = {
+        # NEW: Define a custom alphabet that includes all necessary characters
+        fpe_custom_alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789 .,&'-()"
+
+        # 2. De-identification Config: How to transform (using FPE for CUSTOM_COUNTERPARTY_NAME)
+        deidentify_config = {
             "info_type_transformations": {
                 "transformations": [
                     {
-                        "info_types": all_relevant_info_types,
+                        # Apply FPE to CUSTOM_COUNTERPARTY_NAME
+                        "info_types": [{"name": "CUSTOM_COUNTERPARTY_NAME"}],
+                        "primitive_transformation": {
+                            "crypto_replace_ffx_fpe_config": {
+                                "crypto_key": {
+                                    "kms_wrapped": {
+                                        "wrapped_key": wrapped_key,  # <--- FIX: Provide the wrapped key
+                                        "crypto_key_name": DLP_KMS_KEY_NAME
+                                    }
+                                },
+                                #"common_alphabet": "HEXADECIMAL",
+                                "custom_alphabet": fpe_custom_alphabet,
+                                "context": {"name": "trade-agreement-context"},
+                                "surrogate_info_type": {"name": "CUSTOM_COUNTERPARTY_PSEUDONYM"}
+                            }
+                        }
+                    },
+                    {
+                        # Apply simple redaction to other sensitive types
+                        "info_types": [
+                            {"name": "EMAIL_ADDRESS"},
+                            {"name": "PHONE_NUMBER"},
+                            {"name": "CREDIT_CARD_NUMBER"},
+                            {"name": "PERSON_NAME"},
+                            {"name": "DATE_OF_BIRTH"},
+                            {"name": "LOCATION"},
+                            {"name": "IBAN_CODE"},
+                            {"name": "SWIFT_CODE"},
+                        ],
                         "primitive_transformation": {"replace_with_info_type_config": {}}
                     }
                 ]
@@ -202,18 +273,51 @@ def summarize_pdf():
         dlp_request = {
             "parent": dlp_parent,
             "item": dlp_item,
-            "deidentify_config": redact_config,
+            "deidentify_config": deidentify_config,
             "inspect_config": inspect_config,
         }
         
         print("Sending text to DLP for de-identification...")
         dlp_response = dlp_client.deidentify_content(request=dlp_request)
-        deidentified_text = dlp_response.item.value
+        pseudonymized_and_redacted_text = dlp_response.item.value
         print("Received de-identified text from DLP.")
         # --- End DLP Integration ---
 
-        # Prepare the prompt for Gemini with de-identified text
-        prompt = f"Summarize this document in 200 words:\n\n{deidentified_text}"
+        # We will find the "canonical" pseudonym for each of our known counterparties.
+        name_to_pseudonym_map = {}
+        counterparty_names = CUSTOM_COUNTERPARTY_INFO_TYPE[0]["dictionary"]["word_list"]["words"]
+
+        print("Generating canonical pseudonyms for known counterparties...")
+        for name in counterparty_names:
+            # Temporarily create a de-identify request for just this one name
+            temp_dlp_item = {"value": name}
+            temp_dlp_request = {
+                "parent": dlp_parent,
+                "item": temp_dlp_item,
+                "deidentify_config": deidentify_config,
+                "inspect_config": inspect_config,
+            }
+            temp_response = dlp_client.deidentify_content(request=temp_dlp_request)
+            pseudonym = temp_response.item.value
+            name_to_pseudonym_map[name] = pseudonym
+            print(f"  Mapped '{name}' -> '{pseudonym}'")
+
+
+        # Prepare the prompt for Gemini with de-identified (and pseudonymized) text
+        prompt = f"""Please tell me the main points of the document below, including the two main parties involved, in the following format:
+
+        Counterparty 1: (counterparty 1 name)
+        Counterparty 2: (counterparty 2 name)
+        Agreement Date: (agreement date)
+        Agreement Type: (agreement type)
+
+        Do not provide any other information.
+
+        The document contains special placeholder text (e.g., inside parentheses or as long alphanumeric strings). It is critical that you treat these placeholders as single, unchangeable units. Do not modify, correct, or add punctuation to them. Reproduce them exactly as they appear in the source text.
+
+        DOCUMENT:
+        {pseudonymized_and_redacted_text}
+        """
 
         print("Sending de-identified text to Gemini...")
         response = model.generate_content(
@@ -221,14 +325,27 @@ def summarize_pdf():
             generation_config={"max_output_tokens": 200, "temperature": 0.2}
         )
 
-        summary = response.text
+        summary_from_llm = response.text
         print("Received summary from Gemini.")
+
+        # We no longer call reidentify_content. We do a simple string replacement.
+        print("Replacing pseudonyms in the final summary using the clean map...")
+        final_summary_with_real_names = summary_from_llm
+
+        for name, pseudonym in name_to_pseudonym_map.items():
+            # Replace the pseudonym with the original name.
+            # Note: This relies on the LLM not altering the pseudonym too much.
+            # A more advanced solution might use fuzzy matching if issues persist.
+            final_summary_with_real_names = final_summary_with_real_names.replace(pseudonym, name)
+
+        print("Summary re-identified with real names.")
         
-        # MODIFIED: Return original_text and deidentified_text too
         return jsonify({
-            "summary": summary,
-            "original_text": pdf_text,
-            "deidentified_text": deidentified_text
+            "summary": final_summary_with_real_names,         
+            "original_text": pdf_text,                         
+            "pseudonymized_text": pseudonymized_and_redacted_text,
+            "deidentified_text": pseudonymized_and_redacted_text,
+            "llm_output_pseudonymized": summary_from_llm       
         })
 
     except Exception as e:
